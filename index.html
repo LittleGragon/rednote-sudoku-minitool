@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>数独大师 · 每日益智</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- ================= 顶部导航栏 ================= -->
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="brand-block">
+          <span class="brand-logo" aria-hidden="true">
+            <svg viewBox="0 0 100 100" width="32" height="32">
+              <defs>
+                <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#667EEA"></stop>
+                  <stop offset="100%" stop-color="#764BA2"></stop>
+                </linearGradient>
+              </defs>
+              <rect x="10" y="10" width="80" height="80" rx="20" fill="url(#logo-grad)"></rect>
+              <rect x="22" y="22" width="16" height="16" rx="4" fill="#ffffff"></rect>
+              <rect x="42" y="22" width="16" height="16" rx="4" fill="rgba(255,255,255,0.4)"></rect>
+              <rect x="62" y="22" width="16" height="16" rx="4" fill="#ffffff"></rect>
+              <rect x="22" y="42" width="16" height="16" rx="4" fill="rgba(255,255,255,0.3)"></rect>
+              <rect x="42" y="42" width="16" height="16" rx="4" fill="#ffffff"></rect>
+              <rect x="62" y="42" width="16" height="16" rx="4" fill="rgba(255,255,255,0.5)"></rect>
+              <rect x="22" y="62" width="16" height="16" rx="4" fill="#ffffff"></rect>
+              <rect x="42" y="62" width="16" height="16" rx="4" fill="rgba(255,255,255,0.6)"></rect>
+              <rect x="62" y="62" width="16" height="16" rx="4" fill="#ffffff"></rect>
+            </svg>
+          </span>
+          <div class="brand-text">
+            <div class="brand-title-row">
+              <span class="brand-title">数独大师</span>
+              <span class="brand-pro-badge">Pro</span>
+            </div>
+            <span class="brand-subtitle">每日益智 · Active Puzzle</span>
+          </div>
+        </div>
+        <!-- 右侧为小红书平台按钮（分享/关闭）系统区，保持留白 -->
+        <div class="platform-safe-area" aria-hidden="true"></div>
+      </div>
+    </header>
+
+    <main class="app-main">
+
+      <!-- ================= 首页：难度选择 ================= -->
+      <section class="view view-home" id="view-home">
+        <div class="home-hero">
+          <h1 class="home-title">开始一局数独</h1>
+          <p class="home-desc">选择难度，每题均保证唯一解</p>
+        </div>
+        <div class="difficulty-list" id="difficulty-list"></div>
+        <button class="btn-start" type="button" data-action="start-game">
+          <span class="btn-start-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path d="M8 5.5v13l11-6.5-11-6.5z" fill="currentColor"></path></svg>
+          </span>
+          开始游戏
+        </button>
+      </section>
+
+      <!-- ================= 游戏页 ================= -->
+      <section class="view view-game" id="view-game" hidden>
+
+        <!-- 状态栏：难度 / 计时 / 错误 / 暂停 -->
+        <section class="status-ribbon">
+          <div class="difficulty-pill">
+            <span class="difficulty-dot" aria-hidden="true"></span>
+            <span id="difficulty-label">中等难度</span>
+          </div>
+          <div class="timer-pill">
+            <span class="icon-18" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"></circle><path d="M12 9.5V13l2.5 1.8M9.5 2h5"></path></svg>
+            </span>
+            <span class="timer-value" id="game-timer">00:00</span>
+          </div>
+          <div class="ribbon-right">
+            <div class="mistake-pill">
+              <span class="icon-15" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 21.2 3.6 13.1a5.4 5.4 0 0 1 7.6-7.6l.8.8.8-.8a5.4 5.4 0 0 1 7.6 7.6L12 21.2z"></path></svg>
+              </span>
+              <span id="mistake-label">0/3</span>
+            </div>
+            <button class="pause-btn" type="button" data-action="toggle-pause" aria-label="暂停游戏">
+              <span class="icon-18" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"></path></svg>
+              </span>
+            </button>
+          </div>
+        </section>
+
+        <!-- 9x9 棋盘 -->
+        <div class="board-wrap">
+          <div class="board-card">
+            <div class="board-grid" id="board-grid"></div>
+          </div>
+          <div class="pause-overlay" id="pause-overlay" hidden>
+            <div class="pause-card">
+              <span class="pause-emoji" aria-hidden="true">⏸</span>
+              <p class="pause-text">游戏已暂停</p>
+              <button class="btn-resume" type="button" data-action="toggle-pause">继续游戏</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 功能工具栏 -->
+        <section class="action-toolbar">
+          <button class="tool-btn" type="button" data-action="back-home" aria-label="返回首页">
+            <span class="tool-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5M5.5 9.5V20h13V9.5"></path></svg>
+            </span>
+            <span class="tool-label">返回</span>
+          </button>
+          <button class="tool-btn" type="button" data-action="restart-game" aria-label="重新开始">
+            <span class="tool-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4h4"></path></svg>
+            </span>
+            <span class="tool-label">重开</span>
+          </button>
+          <button class="tool-btn" type="button" data-action="undo" aria-label="撤销">
+            <span class="tool-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6.5 3.5 11 8 15.5M3.5 11h11.2a5.8 5.8 0 0 1 0 11.6h-3"></path></svg>
+            </span>
+            <span class="tool-label">撤销</span>
+          </button>
+          <button class="tool-btn" type="button" data-action="erase" aria-label="擦除">
+            <span class="tool-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 3.5 6 6L10 20H4.5l-1-1 11-15.5zM8 20h12"></path></svg>
+            </span>
+            <span class="tool-label">擦除</span>
+          </button>
+          <button class="tool-btn" type="button" data-action="toggle-note" aria-label="笔记模式">
+            <span class="tool-icon tool-icon-note" id="note-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1zM14 7l3 3"></path></svg>
+              <span class="tool-badge" id="note-badge">关</span>
+            </span>
+            <span class="tool-label" id="note-label">笔记</span>
+          </button>
+          <button class="tool-btn" type="button" data-action="hint" aria-label="智能提示">
+            <span class="tool-icon" id="hint-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 18h5M10 21h4M12 2.5a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3a7 7 0 0 0-4-12.7z"></path></svg>
+              <span class="tool-badge tool-badge-count" id="hint-badge">3</span>
+            </span>
+            <span class="tool-label">提示</span>
+          </button>
+          <button class="tool-btn" type="button" data-action="check" aria-label="快速检查">
+            <span class="tool-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3.5 12.5 5 5 8.5-11M14 15.5l1.5 1.5 5.5-7"></path></svg>
+            </span>
+            <span class="tool-label">检查</span>
+          </button>
+        </section>
+
+        <!-- 数字键盘 -->
+        <section class="numpad" id="numpad"></section>
+      </section>
+    </main>
+
+    <!-- ================= 完成弹窗 ================= -->
+    <div class="modal-mask" id="win-modal" hidden>
+      <div class="win-card">
+        <span class="win-emoji" aria-hidden="true">🎉</span>
+        <h2 class="win-title">恭喜完成！</h2>
+        <p class="win-desc">你用时 <strong id="win-time">00:00</strong>，错误 <strong id="win-mistakes">0</strong> 次</p>
+        <div class="win-actions">
+          <button class="btn-win-secondary" type="button" data-action="win-back-home">返回首页</button>
+          <button class="btn-win-primary" type="button" data-action="win-next-round">再来一局</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 失败弹窗 ================= -->
+    <div class="modal-mask" id="lose-modal" hidden>
+      <div class="win-card">
+        <span class="win-emoji" aria-hidden="true">💔</span>
+        <h2 class="win-title">错误次数用完了</h2>
+        <p class="win-desc">别灰心，再来一局试试！</p>
+        <div class="win-actions">
+          <button class="btn-win-secondary" type="button" data-action="lose-back-home">返回首页</button>
+          <button class="btn-win-primary" type="button" data-action="restart-game">再来一局</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 检查提示 Toast ================= -->
+    <div class="toast" id="check-toast" hidden></div>
+
+  </div>
+
+  <script src="data.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
