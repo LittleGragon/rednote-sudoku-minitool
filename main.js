@@ -172,6 +172,228 @@
     return arr;
   }
 
+  // ---------------- 本地缓存（进度持久化） ----------------
+  // 优先使用容器 Storage API（客户端 9.46+），低版本/非容器环境回退 localStorage。
+  // 读写失败均静默降级，容忍进度丢失，不影响游戏进行。
+  var SAVE_KEY = 'sudoku_save_v1';
+  var STORAGE_MIN_CLIENT_VERSION = 9460;
+
+  function get_client_version(build_version) {
+    return Math.floor((Number(build_version) || 0) / 1000);
+  }
+
+  function read_build_version(launch_options) {
+    var mini_tool_env = launch_options && launch_options.miniToolEnv;
+    return Number(mini_tool_env && mini_tool_env.buildVersion) || 0;
+  }
+
+  function get_build_version() {
+    var xhs = window.xhs;
+    var sync_version = read_build_version(xhs && xhs.launchOptions);
+    if (sync_version) { return Promise.resolve(sync_version); }
+    var mini_tool = xhs && xhs.miniTool;
+    if (!mini_tool || typeof mini_tool.getLaunchOptions !== 'function') {
+      return Promise.resolve(0);
+    }
+    return mini_tool.getLaunchOptions()
+      .then(read_build_version)
+      .catch(function () { return 0; });
+  }
+
+  function get_mini_tool() {
+    var xhs = window.xhs;
+    return xhs && xhs.miniTool ? xhs.miniTool : null;
+  }
+
+  function local_set(key, serialized) {
+    try {
+      window.localStorage.setItem(key, serialized);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function local_get(key) {
+    try {
+      return window.localStorage.getItem(key);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function local_remove(key) {
+    try {
+      window.localStorage.removeItem(key);
+    } catch (error) {
+      // 忽略：清不掉也不影响游戏
+    }
+  }
+
+  // 写入缓存：9.46+ 用容器 Storage，否则回退 localStorage
+  function storage_set(key, value) {
+    var serialized;
+    try {
+      serialized = JSON.stringify(value);
+    } catch (error) {
+      return;
+    }
+    var mini_tool = get_mini_tool();
+    if (mini_tool && typeof mini_tool.setStorage === 'function') {
+      get_build_version().then(function (build_version) {
+        if (get_client_version(build_version) >= STORAGE_MIN_CLIENT_VERSION) {
+          mini_tool.setStorage({ key: key, data: serialized })
+            .catch(function () { local_set(key, serialized); });
+        } else {
+          local_set(key, serialized);
+        }
+      });
+      return;
+    }
+    local_set(key, serialized);
+  }
+
+  // 读取缓存：返回 Promise<string|null>
+  function storage_get(key) {
+    var mini_tool = get_mini_tool();
+    if (mini_tool && typeof mini_tool.getStorage === 'function') {
+      return get_build_version().then(function (build_version) {
+        if (get_client_version(build_version) >= STORAGE_MIN_CLIENT_VERSION) {
+          return mini_tool.getStorage({ key: key }).then(function (result) {
+            var data = result && result.data;
+            return typeof data === 'string' ? data : local_get(key);
+          });
+        }
+        return local_get(key);
+      }).catch(function () {
+        return local_get(key);
+      });
+    }
+    return Promise.resolve(local_get(key));
+  }
+
+  function storage_remove(key) {
+    var mini_tool = get_mini_tool();
+    if (mini_tool && typeof mini_tool.removeStorage === 'function') {
+      get_build_version().then(function (build_version) {
+        if (get_client_version(build_version) >= STORAGE_MIN_CLIENT_VERSION) {
+          mini_tool.removeStorage({ key: key })
+            .catch(function () { local_remove(key); });
+        } else {
+          local_remove(key);
+        }
+      });
+      return;
+    }
+    local_remove(key);
+  }
+
+  // 保存当前对局（游戏进行中才写；未开局不写）
+  function persist_game() {
+    if (!game_state.puzzle.length || game_state.finished) { return; }
+    storage_set(SAVE_KEY, {
+      version: 1,
+      difficulty_key: game_state.difficulty_key,
+      puzzle: game_state.puzzle,
+      solution: game_state.solution,
+      values: game_state.values,
+      notes: game_state.notes,
+      mistakes: game_state.mistakes,
+      hints_left: game_state.hints_left,
+      elapsed_seconds: game_state.elapsed_seconds
+    });
+  }
+
+  function clear_saved_game() {
+    storage_remove(SAVE_KEY);
+  }
+
+  // 校验缓存数据完整性与一致性，不合法则视为无缓存
+  function is_valid_save(save) {
+    if (!save || save.version !== 1) { return false; }
+    if (!Array.isArray(save.puzzle) || save.puzzle.length !== CELLS) { return false; }
+    if (!Array.isArray(save.solution) || save.solution.length !== CELLS) { return false; }
+    if (!Array.isArray(save.values) || save.values.length !== CELLS) { return false; }
+    if (!Array.isArray(save.notes) || save.notes.length !== CELLS) { return false; }
+    var i;
+    for (i = 0; i < CELLS; i += 1) {
+      var given = save.puzzle[i];
+      var answer = save.solution[i];
+      var value = save.values[i];
+      if (typeof given !== 'number' || given < 0 || given > 9) { return false; }
+      if (typeof answer !== 'number' || answer < 1 || answer > 9) { return false; }
+      if (typeof value !== 'number' || value < 0 || value > 9) { return false; }
+      if (given > 0 && value !== given) {
+        return false; // 报错原因：题面预填数字与盘面不一致，缓存被篡改或损坏
+      }
+      if (!Array.isArray(save.notes[i])) { return false; }
+    }
+    if (typeof save.mistakes !== 'number' || save.mistakes < 0 || save.mistakes >= SUDOKU_GAME_RULES.max_mistakes) {
+      return false; // 报错原因：错误次数已达结束条件，属于已结束对局
+    }
+    if (typeof save.hints_left !== 'number' || save.hints_left < 0 || save.hints_left > SUDOKU_GAME_RULES.max_hints) { return false; }
+    if (typeof save.elapsed_seconds !== 'number' || save.elapsed_seconds < 0) { return false; }
+    for (i = 0; i < CELLS; i += 1) {
+      if (save.values[i] !== save.solution[i]) { return true; } // 有未完成格子，可恢复
+    }
+    return false; // 报错原因：盘面已全部正确，无需恢复
+  }
+
+  // 从缓存恢复对局并直接进入游戏页
+  function restore_saved_game(save) {
+    game_state.difficulty_key = save.difficulty_key;
+    game_state.puzzle = save.puzzle;
+    game_state.solution = save.solution;
+    game_state.values = save.values;
+    game_state.notes = save.notes;
+    game_state.is_given = [];
+    var i;
+    for (i = 0; i < CELLS; i += 1) {
+      game_state.is_given.push(game_state.puzzle[i] > 0);
+    }
+    game_state.selected_index = -1;
+    game_state.selected_digit = 0;
+    game_state.note_mode = false;
+    game_state.mistakes = save.mistakes;
+    game_state.hints_left = save.hints_left;
+    game_state.elapsed_seconds = save.elapsed_seconds;
+    game_state.paused = false;
+    game_state.finished = false;
+    undo_stack = [];
+
+    dom.difficulty_label.textContent = get_difficulty(save.difficulty_key).label;
+    dom.pause_overlay.hidden = true;
+    dom.win_modal.hidden = true;
+    dom.lose_modal.hidden = true;
+    dom.view_home.hidden = true;
+    dom.view_game.hidden = false;
+    window.scrollTo(0, 0);
+    render_all();
+    start_timer();
+    show_toast('已恢复上次未完成的对局');
+  }
+
+  // 进入页面时检查缓存
+  function resume_saved_game_if_exists() {
+    storage_get(SAVE_KEY).then(function (raw) {
+      if (!raw) { return null; }
+      var save = null;
+      try {
+        save = JSON.parse(raw);
+      } catch (error) {
+        clear_saved_game(); // 缓存不是合法 JSON，直接清掉
+        return null;
+      }
+      if (!is_valid_save(save)) {
+        clear_saved_game(); // 数据不完整或与题面矛盾，按无缓存处理
+        return null;
+      }
+      return save;
+    }).then(function (save) {
+      if (save) { restore_saved_game(save); }
+    });
+  }
+
   // ---------------- 工具函数 ----------------
   function format_seconds(total_seconds) {
     var mins = Math.floor(total_seconds / 60);
@@ -406,6 +628,7 @@
   // ---------------- 游戏流程 ----------------
   function start_game(difficulty_key) {
     var option = get_difficulty(difficulty_key);
+    clear_saved_game();
     game_state.difficulty_key = option.key;
     var built = build_puzzle(option.given_count);
     game_state.puzzle = built.puzzle;
@@ -484,6 +707,7 @@
     }
     render_all();
     check_win_or_lose();
+    persist_game();
   }
 
   function set_value(index, digit) {
@@ -521,6 +745,7 @@
     game_state.values[index] = 0;
     game_state.notes[index] = [];
     render_all();
+    persist_game();
   }
 
   function undo_step() {
@@ -535,6 +760,7 @@
     game_state.mistakes = entry.prev_mistakes;
     game_state.selected_index = entry.index;
     render_all();
+    persist_game();
   }
 
   function use_hint() {
@@ -563,6 +789,7 @@
     game_state.selected_digit = game_state.solution[index];
     render_all();
     check_win_or_lose();
+    persist_game();
   }
 
   function check_board() {
@@ -592,6 +819,7 @@
     if (game_state.mistakes >= SUDOKU_GAME_RULES.max_mistakes) {
       game_state.finished = true;
       stop_timer();
+      clear_saved_game();
       dom.lose_modal.hidden = false;
       return;
     }
@@ -601,6 +829,7 @@
     }
     game_state.finished = true;
     stop_timer();
+    clear_saved_game();
     dom.win_time.textContent = format_seconds(game_state.elapsed_seconds);
     dom.win_mistakes.textContent = String(game_state.mistakes);
     dom.win_modal.hidden = false;
@@ -730,6 +959,7 @@
     build_numpad();
     render_home();
     bind_actions();
+    resume_saved_game_if_exists();
   }
 
   if (document.readyState === 'loading') {
