@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>数独大师 · 每日益智</title>
+  <title>Sudoku Matrix · 每日益智</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -34,11 +34,8 @@
             </svg>
           </span>
           <div class="brand-text">
-            <div class="brand-title-row">
-              <span class="brand-title">数独大师</span>
-              <span class="brand-pro-badge">Pro</span>
-            </div>
-            <span class="brand-subtitle">每日益智 · Active Puzzle</span>
+            <span class="brand-title">Sudoku Matrix</span>
+            <span class="brand-subtitle">数独大师 Pro · 无压心流模式</span>
           </div>
         </div>
         <!-- 右侧为小红书平台按钮（分享/关闭）系统区，保持留白 -->
@@ -66,7 +63,7 @@
       <!-- ================= 游戏页 ================= -->
       <section class="view view-game" id="view-game" hidden>
 
-        <!-- 状态栏：难度 / 计时 / 错误 / 暂停 -->
+        <!-- 状态栏：难度 / 每日益智 / 计时 / 完成度 / 暂停 -->
         <section class="status-ribbon">
           <div class="difficulty-pill">
             <span class="difficulty-dot" aria-hidden="true"></span>
@@ -79,11 +76,8 @@
             <span class="timer-value" id="game-timer">00:00</span>
           </div>
           <div class="ribbon-right">
-            <div class="mistake-pill">
-              <span class="icon-15" aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 21.2 3.6 13.1a5.4 5.4 0 0 1 7.6-7.6l.8.8.8-.8a5.4 5.4 0 0 1 7.6 7.6L12 21.2z"></path></svg>
-              </span>
-              <span id="mistake-label">0/3</span>
+            <div class="progress-pill">
+              <span id="progress-label">0/81</span>
             </div>
             <button class="pause-btn" type="button" data-action="toggle-pause" aria-label="暂停游戏">
               <span class="icon-18" aria-hidden="true">
@@ -115,45 +109,47 @@
             </span>
             <span class="tool-label">返回</span>
           </button>
-          <button class="tool-btn" type="button" data-action="restart-game" aria-label="重新开始">
-            <span class="tool-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4h4"></path></svg>
-            </span>
-            <span class="tool-label">重开</span>
-          </button>
           <button class="tool-btn" type="button" data-action="undo" aria-label="撤销">
             <span class="tool-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6.5 3.5 11 8 15.5M3.5 11h11.2a5.8 5.8 0 0 1 0 11.6h-3"></path></svg>
             </span>
             <span class="tool-label">撤销</span>
           </button>
-          <button class="tool-btn" type="button" data-action="erase" aria-label="擦除">
+          <button class="tool-btn" type="button" data-action="erase" aria-label="橡皮擦">
             <span class="tool-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 3.5 6 6L10 20H4.5l-1-1 11-15.5zM8 20h12"></path></svg>
             </span>
             <span class="tool-label">擦除</span>
           </button>
-          <button class="tool-btn" type="button" data-action="toggle-note" aria-label="笔记模式">
+          <button class="tool-btn tool-btn-primary" type="button" data-action="toggle-note" aria-label="笔记候选数模式">
             <span class="tool-icon tool-icon-note" id="note-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1zM14 7l3 3"></path></svg>
               <span class="tool-badge" id="note-badge">关</span>
             </span>
-            <span class="tool-label" id="note-label">笔记</span>
+            <span class="tool-label" id="note-label">标记</span>
           </button>
           <button class="tool-btn" type="button" data-action="hint" aria-label="智能提示">
-            <span class="tool-icon" id="hint-icon" aria-hidden="true">
+            <span class="tool-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 18h5M10 21h4M12 2.5a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3a7 7 0 0 0-4-12.7z"></path></svg>
-              <span class="tool-badge tool-badge-count" id="hint-badge">3</span>
             </span>
             <span class="tool-label">提示</span>
           </button>
-          <button class="tool-btn" type="button" data-action="check" aria-label="快速检查">
+          <button class="tool-btn" type="button" data-action="restart-game" aria-label="重新开始">
             <span class="tool-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3.5 12.5 5 5 8.5-11M14 15.5l1.5 1.5 5.5-7"></path></svg>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4h4"></path></svg>
             </span>
-            <span class="tool-label">检查</span>
+            <span class="tool-label">重开</span>
+          </button>
+          <button class="tool-btn" type="button" data-action="toggle-theme" aria-label="日夜主题切换">
+            <span class="tool-icon" id="theme-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"></circle><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"></path></svg>
+            </span>
+            <span class="tool-label" id="theme-label">夜间</span>
           </button>
         </section>
+
+        <!-- 底部引导语 -->
+        <p class="flow-hint">✨ 纯净解题无扣命惩罚 · 专注每次逻辑推导</p>
 
         <!-- 数字键盘 -->
         <section class="numpad" id="numpad"></section>
@@ -165,23 +161,10 @@
       <div class="win-card">
         <span class="win-emoji" aria-hidden="true">🎉</span>
         <h2 class="win-title">恭喜完成！</h2>
-        <p class="win-desc">你用时 <strong id="win-time">00:00</strong>，错误 <strong id="win-mistakes">0</strong> 次</p>
+        <p class="win-desc">你用时 <strong id="win-time">00:00</strong></p>
         <div class="win-actions">
           <button class="btn-win-secondary" type="button" data-action="win-back-home">返回首页</button>
           <button class="btn-win-primary" type="button" data-action="win-next-round">再来一局</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ================= 失败弹窗 ================= -->
-    <div class="modal-mask" id="lose-modal" hidden>
-      <div class="win-card">
-        <span class="win-emoji" aria-hidden="true">💔</span>
-        <h2 class="win-title">错误次数用完了</h2>
-        <p class="win-desc">别灰心，再来一局试试！</p>
-        <div class="win-actions">
-          <button class="btn-win-secondary" type="button" data-action="lose-back-home">返回首页</button>
-          <button class="btn-win-primary" type="button" data-action="restart-game">再来一局</button>
         </div>
       </div>
     </div>

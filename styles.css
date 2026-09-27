@@ -1,7 +1,8 @@
-/* 数独小工具 - 样式表
-   设计来源：Stitch「数独游戏主界面（小红书规范版）」
-   基线：Chrome 61 —— 不使用 inset 简写 / flex gap / aspect-ratio / min()；
-        100dvh 前提供 100vh 回退；安全区用 var(--safe-area-*, env(...)) 回退。 */
+/* Sudoku Matrix 小工具 - 样式表
+   设计来源：Stitch「数独游戏主界面（日间模式 / 夜间深色模式）」
+   基线：Chrome 61 —— 不使用 inset 简写 / aspect-ratio / min()；
+        100dvh 前提供 100vh 回退；安全区用 var(--safe-area-*, env(...)) 回退。
+   主题：html[data-theme="light"] 为默认；html[data-theme="dark"] 覆盖色板变量。 */
 
 :root {
   --primary: #3953bd;
@@ -26,9 +27,42 @@
   --error-container: #ffdad6;
   --error-surface: #fed7d7;
   --on-error-container: #93000a;
+  --header-bg: rgba(248, 249, 252, 0.85);
+  --overlay-bg: rgba(248, 249, 252, 0.72);
+  --toast-bg: rgba(45, 55, 72, 0.94);
+  --card-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
   --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   --gutter: 0.75rem;
+}
+
+/* 夜间深色模式（对齐设计稿：#191c1e 底、#667eea 主色） */
+html[data-theme="dark"] {
+  --primary: #667eea;
+  --primary-container: #7c8ff0;
+  --secondary: #9a7fd0;
+  --secondary-fixed: #3a2f4d;
+  --on-secondary-fixed: #e6d9f5;
+  --surface: #191c1e;
+  --surface-card: #21252b;
+  --surface-container: #2b3134;
+  --surface-container-low: #23272b;
+  --surface-crosshair: #262c33;
+  --border-subtle: #333a3d;
+  --border-block: #4a5558;
+  --text-primary: #e2e2e5;
+  --text-secondary: #a8b0b3;
+  --text-muted: #7a8285;
+  --on-surface-variant: #b8c0c3;
+  --error: #f28b82;
+  --error-solid: #f28b82;
+  --error-container: #3c2a2a;
+  --error-surface: #4a2c2c;
+  --on-error-container: #f2c4c0;
+  --header-bg: rgba(25, 28, 30, 0.85);
+  --overlay-bg: rgba(25, 28, 30, 0.78);
+  --toast-bg: rgba(226, 226, 229, 0.94);
+  --card-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -49,6 +83,7 @@ body {
     "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 button {
@@ -75,10 +110,11 @@ button {
   right: 0;
   z-index: 50;
   padding-top: var(--safe-top);
-  background: rgba(248, 249, 252, 0.85);
+  background: var(--header-bg);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   box-shadow: 0 1px 8px rgba(0, 0, 0, 0.04);
+  transition: background-color 0.25s ease;
 }
 
 .header-inner {
@@ -95,19 +131,8 @@ button {
 .brand-block { display: flex; align-items: center; }
 .brand-logo { display: inline-flex; width: 32px; height: 32px; margin-right: 8px; }
 .brand-text { display: flex; flex-direction: column; }
-.brand-title-row { display: flex; align-items: center; }
-.brand-title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; line-height: 1; }
-.brand-pro-badge {
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 6px;
-  background: rgba(57, 83, 189, 0.1);
-  color: var(--primary);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1.3;
-}
-.brand-subtitle { margin-top: 3px; font-size: 11px; color: var(--on-surface-variant); line-height: 1; }
+.brand-title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+.brand-subtitle { margin-top: 2px; font-size: 11px; color: var(--on-surface-variant); line-height: 1; }
 
 /* 右上角平台按钮安全区占位（仅留白，不放任何自定义元素） */
 .platform-safe-area {
@@ -152,7 +177,7 @@ button {
   margin-bottom: 12px;
   border-radius: 16px;
   background: var(--surface-card);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--card-shadow);
   border: 2px solid transparent;
   text-align: left;
   transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
@@ -246,17 +271,17 @@ button {
   letter-spacing: 0.04em;
 }
 .ribbon-right { display: flex; align-items: center; }
-.mistake-pill {
+.progress-pill {
   display: flex;
   align-items: center;
   padding: 4px 10px;
   border-radius: 9999px;
-  background: var(--error-container);
-  color: var(--on-error-container);
+  background: var(--surface-container);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
-.mistake-pill .icon-15 { color: var(--error); margin-right: 4px; display: inline-flex; }
 .pause-btn {
   width: 32px;
   height: 32px;
@@ -282,6 +307,7 @@ button {
   border-radius: 12px;
   box-shadow: 0 10px 25px -5px rgba(102, 126, 234, 0.14);
   padding: 6px;
+  transition: background-color 0.25s ease;
 }
 .board-grid {
   display: grid;
@@ -326,11 +352,13 @@ button {
 /* 高亮层 */
 .cell.is-crosshair { background: var(--surface-crosshair); }
 .cell.is-same-digit { background: rgba(57, 83, 189, 0.08); }
+html[data-theme="dark"] .cell.is-same-digit { background: rgba(102, 126, 234, 0.14); }
 .cell.is-selected {
   background: rgba(57, 83, 189, 0.12);
   box-shadow: inset 0 0 0 2px var(--primary);
   z-index: 2;
 }
+html[data-theme="dark"] .cell.is-selected { background: rgba(102, 126, 234, 0.18); }
 .cell.is-error-cell { background: var(--error-surface); animation: pulse 1.5s ease-in-out infinite; }
 .cell.is-error-cell::after {
   content: "";
@@ -369,7 +397,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(248, 249, 252, 0.72);
+  background: var(--overlay-bg);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   border-radius: 12px;
@@ -411,16 +439,22 @@ button {
   height: 44px;
   border-radius: 9999px;
   background: var(--surface-card);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--card-shadow);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 .tool-label { margin-top: 4px; font-size: 11px; color: var(--text-secondary); }
 .tool-btn.is-disabled { opacity: 0.4; }
 
-/* 笔记开启态 */
+/* 标记（笔记）主按钮：开启态为渐变填充 */
+.tool-btn-primary .tool-icon {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  color: var(--on-primary);
+  box-shadow: 0 4px 12px rgba(57, 83, 189, 0.3);
+}
 .tool-icon-note.is-active {
   background: var(--primary);
   color: var(--on-primary);
@@ -444,8 +478,15 @@ button {
   line-height: 16px;
   text-align: center;
 }
-.tool-badge-count { background: var(--secondary-fixed); color: var(--on-secondary-fixed); }
 .tool-badge.is-hidden { display: none; }
+
+/* ================= 底部引导语 ================= */
+.flow-hint {
+  margin: 2px 0 8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
 
 /* ================= 数字键盘 ================= */
 .numpad {
@@ -466,7 +507,7 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  transition: transform 0.1s ease;
+  transition: transform 0.1s ease, background-color 0.2s ease;
 }
 .num-key:active { transform: scale(0.95); }
 .num-key-value { font-size: 20px; font-weight: 700; line-height: 1.1; color: var(--text-primary); }
@@ -540,7 +581,7 @@ button {
   max-width: 88%;
   padding: 10px 18px;
   border-radius: 9999px;
-  background: rgba(45, 55, 72, 0.94);
+  background: var(--toast-bg);
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -548,6 +589,7 @@ button {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
   animation: fade-in 0.2s ease;
 }
+html[data-theme="dark"] .toast { color: #191c1e; }
 
 /* ================= 动画 ================= */
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }

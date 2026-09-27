@@ -1,4 +1,4 @@
-// 数独小工具 - 游戏逻辑
+// Sudoku Matrix 小工具 - 游戏逻辑
 // 基线 ES2017：不使用可选链(?.)、空值合并(??)、对象展开等语法。
 // 交互规范：无内联事件，统一 data-action / data-cell / data-digit + 事件委托。
 
@@ -20,8 +20,6 @@
     selected_index: -1,
     selected_digit: 0,
     note_mode: false,
-    mistakes: 0,
-    hints_left: SUDOKU_GAME_RULES.max_hints,
     elapsed_seconds: 0,
     paused: false,
     finished: false
@@ -40,16 +38,14 @@
     numpad: document.getElementById('numpad'),
     game_timer: document.getElementById('game-timer'),
     difficulty_label: document.getElementById('difficulty-label'),
-    mistake_label: document.getElementById('mistake-label'),
+    progress_label: document.getElementById('progress-label'),
     note_icon: document.getElementById('note-icon'),
     note_badge: document.getElementById('note-badge'),
     note_label: document.getElementById('note-label'),
-    hint_badge: document.getElementById('hint-badge'),
     pause_overlay: document.getElementById('pause-overlay'),
     win_modal: document.getElementById('win-modal'),
     win_time: document.getElementById('win-time'),
-    win_mistakes: document.getElementById('win-mistakes'),
-    lose_modal: document.getElementById('lose-modal'),
+    theme_label: document.getElementById('theme-label'),
     check_toast: document.getElementById('check-toast')
   };
 
@@ -292,14 +288,12 @@
   function persist_game() {
     if (!game_state.puzzle.length || game_state.finished) { return; }
     storage_set(SAVE_KEY, {
-      version: 1,
+      version: 2,
       difficulty_key: game_state.difficulty_key,
       puzzle: game_state.puzzle,
       solution: game_state.solution,
       values: game_state.values,
       notes: game_state.notes,
-      mistakes: game_state.mistakes,
-      hints_left: game_state.hints_left,
       elapsed_seconds: game_state.elapsed_seconds
     });
   }
@@ -310,7 +304,7 @@
 
   // 校验缓存数据完整性与一致性，不合法则视为无缓存
   function is_valid_save(save) {
-    if (!save || save.version !== 1) { return false; }
+    if (!save || save.version !== 2) { return false; }
     if (!Array.isArray(save.puzzle) || save.puzzle.length !== CELLS) { return false; }
     if (!Array.isArray(save.solution) || save.solution.length !== CELLS) { return false; }
     if (!Array.isArray(save.values) || save.values.length !== CELLS) { return false; }
@@ -328,10 +322,6 @@
       }
       if (!Array.isArray(save.notes[i])) { return false; }
     }
-    if (typeof save.mistakes !== 'number' || save.mistakes < 0 || save.mistakes >= SUDOKU_GAME_RULES.max_mistakes) {
-      return false; // 报错原因：错误次数已达结束条件，属于已结束对局
-    }
-    if (typeof save.hints_left !== 'number' || save.hints_left < 0 || save.hints_left > SUDOKU_GAME_RULES.max_hints) { return false; }
     if (typeof save.elapsed_seconds !== 'number' || save.elapsed_seconds < 0) { return false; }
     for (i = 0; i < CELLS; i += 1) {
       if (save.values[i] !== save.solution[i]) { return true; } // 有未完成格子，可恢复
@@ -354,8 +344,6 @@
     game_state.selected_index = -1;
     game_state.selected_digit = 0;
     game_state.note_mode = false;
-    game_state.mistakes = save.mistakes;
-    game_state.hints_left = save.hints_left;
     game_state.elapsed_seconds = save.elapsed_seconds;
     game_state.paused = false;
     game_state.finished = false;
@@ -364,7 +352,6 @@
     dom.difficulty_label.textContent = get_difficulty(save.difficulty_key).label;
     dom.pause_overlay.hidden = true;
     dom.win_modal.hidden = true;
-    dom.lose_modal.hidden = true;
     dom.view_home.hidden = true;
     dom.view_game.hidden = false;
     window.scrollTo(0, 0);
@@ -423,9 +410,8 @@
   function push_undo(index) {
     undo_stack.push({
       index: index,
-      prev_value: game_state.values[index],
       prev_notes: game_state.notes[index].slice(),
-      prev_mistakes: game_state.mistakes
+      prev_value: game_state.values[index]
     });
     if (undo_stack.length > 200) { undo_stack.shift(); }
   }
@@ -581,13 +567,12 @@
 
   function update_status_bar() {
     dom.game_timer.textContent = format_seconds(game_state.elapsed_seconds);
-    dom.mistake_label.textContent = game_state.mistakes + '/' + SUDOKU_GAME_RULES.max_mistakes;
-    dom.hint_badge.textContent = String(game_state.hints_left);
-    if (game_state.hints_left <= 0) {
-      dom.hint_badge.classList.add('is-hidden');
-    } else {
-      dom.hint_badge.classList.remove('is-hidden');
+    var filled = 0;
+    var i;
+    for (i = 0; i < CELLS; i += 1) {
+      if (game_state.values[i] > 0) { filled += 1; }
     }
+    dom.progress_label.textContent = filled + '/' + CELLS;
     var note_on = game_state.note_mode;
     if (note_on) {
       dom.note_icon.classList.add('is-active');
@@ -644,8 +629,6 @@
     game_state.selected_index = -1;
     game_state.selected_digit = 0;
     game_state.note_mode = false;
-    game_state.mistakes = 0;
-    game_state.hints_left = SUDOKU_GAME_RULES.max_hints;
     game_state.elapsed_seconds = 0;
     game_state.paused = false;
     game_state.finished = false;
@@ -654,7 +637,6 @@
     dom.difficulty_label.textContent = option.label;
     dom.pause_overlay.hidden = true;
     dom.win_modal.hidden = true;
-    dom.lose_modal.hidden = true;
 
     dom.view_home.hidden = true;
     dom.view_game.hidden = false;
@@ -668,7 +650,6 @@
     dom.view_game.hidden = true;
     dom.view_home.hidden = false;
     dom.win_modal.hidden = true;
-    dom.lose_modal.hidden = true;
     dom.pause_overlay.hidden = true;
   }
 
@@ -706,7 +687,7 @@
       set_value(index, digit);
     }
     render_all();
-    check_win_or_lose();
+    check_win();
     persist_game();
   }
 
@@ -715,9 +696,6 @@
     push_undo(index);
     game_state.values[index] = digit;
     game_state.notes[index] = [];
-    if (digit !== game_state.solution[index]) {
-      game_state.mistakes += 1;
-    }
     var num_el = cell_elements[index].querySelector('.cell-num');
     num_el.classList.add('pop-in');
     window.setTimeout(function () { num_el.classList.remove('pop-in'); }, 200);
@@ -757,7 +735,6 @@
     var entry = undo_stack.pop();
     game_state.values[entry.index] = entry.prev_value;
     game_state.notes[entry.index] = entry.prev_notes;
-    game_state.mistakes = entry.prev_mistakes;
     game_state.selected_index = entry.index;
     render_all();
     persist_game();
@@ -765,10 +742,6 @@
 
   function use_hint() {
     if (game_state.finished || game_state.paused) { return; }
-    if (game_state.hints_left <= 0) {
-      show_toast('提示次数已用完');
-      return;
-    }
     var index = game_state.selected_index;
     if (index < 0 || game_state.is_given[index] || game_state.values[index] === game_state.solution[index]) {
       index = -1;
@@ -781,31 +754,14 @@
       }
     }
     if (index < 0) { return; }
-    game_state.hints_left -= 1;
     push_undo(index);
     game_state.values[index] = game_state.solution[index];
     game_state.notes[index] = [];
     game_state.selected_index = index;
     game_state.selected_digit = game_state.solution[index];
     render_all();
-    check_win_or_lose();
+    check_win();
     persist_game();
-  }
-
-  function check_board() {
-    if (game_state.finished || game_state.paused) { return; }
-    var wrong = 0;
-    var empty = 0;
-    var i;
-    for (i = 0; i < CELLS; i += 1) {
-      if (game_state.is_given[i]) { continue; }
-      if (game_state.values[i] === 0) { empty += 1; continue; }
-      if (game_state.values[i] !== game_state.solution[i]) { wrong += 1; }
-    }
-    if (wrong > 0) { show_toast('发现 ' + wrong + ' 处错误，已红色标记'); }
-    else if (empty > 0) { show_toast('当前填写全部正确，继续加油'); }
-    else { show_toast('太棒了，全部正确'); }
-    render_all();
   }
 
   function toggle_pause() {
@@ -814,15 +770,8 @@
     dom.pause_overlay.hidden = !game_state.paused;
   }
 
-  function check_win_or_lose() {
+  function check_win() {
     if (game_state.finished) { return; }
-    if (game_state.mistakes >= SUDOKU_GAME_RULES.max_mistakes) {
-      game_state.finished = true;
-      stop_timer();
-      clear_saved_game();
-      dom.lose_modal.hidden = false;
-      return;
-    }
     var i;
     for (i = 0; i < CELLS; i += 1) {
       if (game_state.values[i] !== game_state.solution[i]) { return; }
@@ -831,8 +780,35 @@
     stop_timer();
     clear_saved_game();
     dom.win_time.textContent = format_seconds(game_state.elapsed_seconds);
-    dom.win_mistakes.textContent = String(game_state.mistakes);
     dom.win_modal.hidden = false;
+  }
+
+  // ---------------- 日夜主题 ----------------
+  var THEME_KEY = 'sudoku_theme_v1';
+
+  function apply_theme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    dom.theme_label.textContent = theme === 'dark' ? '日间' : '夜间';
+  }
+
+  function toggle_theme() {
+    var current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    var next = current === 'dark' ? 'light' : 'dark';
+    apply_theme(next);
+    storage_set(THEME_KEY, next);
+  }
+
+  function restore_theme() {
+    storage_get(THEME_KEY).then(function (raw) {
+      var theme = 'light';
+      try {
+        // storage_set 写入时已 JSON 序列化，这里需反解后再比较
+        if (JSON.parse(raw) === 'dark') { theme = 'dark'; }
+      } catch (error) {
+        // 报错原因：主题缓存非法 JSON，按默认日间模式处理
+      }
+      apply_theme(theme);
+    });
   }
 
   // ---------------- Toast ----------------
@@ -937,11 +913,10 @@
         case 'hint':
           use_hint();
           break;
-        case 'check':
-          check_board();
+        case 'toggle-theme':
+          toggle_theme();
           break;
         case 'win-back-home':
-        case 'lose-back-home':
           back_home();
           break;
         case 'win-next-round':
@@ -959,6 +934,7 @@
     build_numpad();
     render_home();
     bind_actions();
+    restore_theme();
     resume_saved_game_if_exists();
   }
 

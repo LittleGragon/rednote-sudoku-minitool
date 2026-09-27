@@ -1,4 +1,4 @@
-// 数独小工具 - 数据配置（难度参数与游戏规则）
+// Sudoku Matrix 小工具 - 数据配置（难度参数与游戏规则）
 
 // 三档难度：预填数字数量符合 PRD 要求
 var SUDOKU_DIFFICULTY_OPTIONS = [
@@ -22,10 +22,8 @@ var SUDOKU_DIFFICULTY_OPTIONS = [
   }
 ];
 
-// 游戏规则参数
+// 游戏规则参数（无压心流模式：无生命惩罚、提示不限次数）
 var SUDOKU_GAME_RULES = {
-  max_mistakes: 3,
-  max_hints: 3,
   board_size: 9,
   box_size: 3
 };
