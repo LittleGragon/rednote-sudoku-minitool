@@ -22,8 +22,20 @@ var SUDOKU_DIFFICULTY_OPTIONS = [
   }
 ];
 
-// 游戏规则参数（无压心流模式：无生命惩罚、提示不限次数）
+// 游戏规则参数（无压心流模式：无生命惩罚、检查不扣分）
 var SUDOKU_GAME_RULES = {
   board_size: 9,
   box_size: 3
+};
+
+// 通关评级时间阈值（单位：秒），按难度分别定义。
+// 评级综合「用时」与「推导步数是否零浪费」：
+//   S+ ：零浪费（步数==需填格数）且用时 <= s_plus
+//   S  ：零浪费，或用时 <= s
+//   A  ：用时 <= a
+//   B  ：其余
+var SUDOKU_GRADE_THRESHOLDS = {
+  easy: { s_plus: 180, s: 300, a: 480 },
+  medium: { s_plus: 360, s: 600, a: 900 },
+  hard: { s_plus: 600, s: 900, a: 1500 }
 };

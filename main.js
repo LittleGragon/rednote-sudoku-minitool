@@ -21,11 +21,11 @@
     selected_digit: 0,
     note_mode: false,
     elapsed_seconds: 0,
-    paused: false,
+    steps: 0,          // 本次填对数字的次数（推导步数）
+    note_count: 0,     // 本次笔记模式写入候选的次数
     finished: false
   };
 
-  var undo_stack = [];
   var timer_id = null;
   var toast_timer_id = null;
 
@@ -38,13 +38,16 @@
     numpad: document.getElementById('numpad'),
     game_timer: document.getElementById('game-timer'),
     difficulty_label: document.getElementById('difficulty-label'),
-    progress_label: document.getElementById('progress-label'),
-    note_icon: document.getElementById('note-icon'),
-    note_badge: document.getElementById('note-badge'),
-    note_label: document.getElementById('note-label'),
-    pause_overlay: document.getElementById('pause-overlay'),
+    note_btn: document.getElementById('note-btn'),
     win_modal: document.getElementById('win-modal'),
-    win_time: document.getElementById('win-time'),
+    win_subtitle: document.getElementById('win-subtitle'),
+    stat_time: document.getElementById('stat-time'),
+    stat_best_tag: document.getElementById('stat-best-tag'),
+    stat_steps: document.getElementById('stat-steps'),
+    stat_notes: document.getElementById('stat-notes'),
+    stat_note_rate: document.getElementById('stat-note-rate'),
+    stat_grade: document.getElementById('stat-grade'),
+    stat_perfect_tag: document.getElementById('stat-perfect-tag'),
     theme_label: document.getElementById('theme-label'),
     check_toast: document.getElementById('check-toast')
   };
@@ -288,13 +291,15 @@
   function persist_game() {
     if (!game_state.puzzle.length || game_state.finished) { return; }
     storage_set(SAVE_KEY, {
-      version: 2,
+      version: 3,
       difficulty_key: game_state.difficulty_key,
       puzzle: game_state.puzzle,
       solution: game_state.solution,
       values: game_state.values,
       notes: game_state.notes,
-      elapsed_seconds: game_state.elapsed_seconds
+      elapsed_seconds: game_state.elapsed_seconds,
+      steps: game_state.steps,
+      note_count: game_state.note_count
     });
   }
 
@@ -304,7 +309,9 @@
 
   // 校验缓存数据完整性与一致性，不合法则视为无缓存
   function is_valid_save(save) {
-    if (!save || save.version !== 2) { return false; }
+    if (!save || save.version !== 3) {
+      return false; // 报错原因：存档版本非 v3（旧版结构缺少统计字段），按无缓存处理并清除
+    }
     if (!Array.isArray(save.puzzle) || save.puzzle.length !== CELLS) { return false; }
     if (!Array.isArray(save.solution) || save.solution.length !== CELLS) { return false; }
     if (!Array.isArray(save.values) || save.values.length !== CELLS) { return false; }
@@ -323,6 +330,12 @@
       if (!Array.isArray(save.notes[i])) { return false; }
     }
     if (typeof save.elapsed_seconds !== 'number' || save.elapsed_seconds < 0) { return false; }
+    if (typeof save.steps !== 'number' || save.steps < 0) {
+      return false; // 报错原因：推导步数字段缺失或非法，缓存被篡改或损坏
+    }
+    if (typeof save.note_count !== 'number' || save.note_count < 0) {
+      return false; // 报错原因：笔记次数字段缺失或非法，缓存被篡改或损坏
+    }
     for (i = 0; i < CELLS; i += 1) {
       if (save.values[i] !== save.solution[i]) { return true; } // 有未完成格子，可恢复
     }
@@ -345,12 +358,11 @@
     game_state.selected_digit = 0;
     game_state.note_mode = false;
     game_state.elapsed_seconds = save.elapsed_seconds;
-    game_state.paused = false;
+    game_state.steps = save.steps;
+    game_state.note_count = save.note_count;
     game_state.finished = false;
-    undo_stack = [];
 
     dom.difficulty_label.textContent = get_difficulty(save.difficulty_key).label;
-    dom.pause_overlay.hidden = true;
     dom.win_modal.hidden = true;
     dom.view_home.hidden = true;
     dom.view_game.hidden = false;
@@ -405,15 +417,6 @@
       if (game_state.values[i] === digit) { count += 1; }
     }
     return 9 - count;
-  }
-
-  function push_undo(index) {
-    undo_stack.push({
-      index: index,
-      prev_notes: game_state.notes[index].slice(),
-      prev_value: game_state.values[index]
-    });
-    if (undo_stack.length > 200) { undo_stack.shift(); }
   }
 
   // ---------------- 渲染 ----------------
@@ -555,10 +558,10 @@
       if (remaining <= 0) {
         cls += ' is-exhausted';
         btn.disabled = true;
-        cnt_el.textContent = '已填满';
+        cnt_el.textContent = '已满';
       } else {
         btn.disabled = false;
-        cnt_el.textContent = '余 ' + remaining;
+        cnt_el.textContent = '余' + remaining;
         if (digit === game_state.selected_digit) { cls += ' is-selected'; }
       }
       btn.className = cls;
@@ -567,24 +570,9 @@
 
   function update_status_bar() {
     dom.game_timer.textContent = format_seconds(game_state.elapsed_seconds);
-    var filled = 0;
-    var i;
-    for (i = 0; i < CELLS; i += 1) {
-      if (game_state.values[i] > 0) { filled += 1; }
-    }
-    dom.progress_label.textContent = filled + '/' + CELLS;
-    var note_on = game_state.note_mode;
-    if (note_on) {
-      dom.note_icon.classList.add('is-active');
-      dom.note_badge.textContent = '开';
-      dom.note_badge.classList.remove('is-hidden');
-    } else {
-      dom.note_icon.classList.remove('is-active');
-      dom.note_badge.classList.add('is-hidden');
-    }
-    var note_btn = dom.note_icon.parentNode;
-    if (note_on) { note_btn.classList.add('note-on'); }
-    else { note_btn.classList.remove('note-on'); }
+    // 标记按钮开启态：主色高亮 + 角标圆点变色
+    if (game_state.note_mode) { dom.note_btn.classList.add('note-on'); }
+    else { dom.note_btn.classList.remove('note-on'); }
   }
 
   function render_all() {
@@ -597,7 +585,7 @@
   function start_timer() {
     stop_timer();
     timer_id = window.setInterval(function () {
-      if (game_state.paused || game_state.finished) { return; }
+      if (game_state.finished) { return; }
       game_state.elapsed_seconds += 1;
       dom.game_timer.textContent = format_seconds(game_state.elapsed_seconds);
     }, 1000);
@@ -630,12 +618,11 @@
     game_state.selected_digit = 0;
     game_state.note_mode = false;
     game_state.elapsed_seconds = 0;
-    game_state.paused = false;
+    game_state.steps = 0;
+    game_state.note_count = 0;
     game_state.finished = false;
-    undo_stack = [];
 
     dom.difficulty_label.textContent = option.label;
-    dom.pause_overlay.hidden = true;
     dom.win_modal.hidden = true;
 
     dom.view_home.hidden = true;
@@ -650,11 +637,10 @@
     dom.view_game.hidden = true;
     dom.view_home.hidden = false;
     dom.win_modal.hidden = true;
-    dom.pause_overlay.hidden = true;
   }
 
   function select_cell(index) {
-    if (game_state.finished || game_state.paused) { return; }
+    if (game_state.finished) { return; }
     game_state.selected_index = index;
     var value = game_state.values[index];
     if (value > 0) { game_state.selected_digit = value; }
@@ -662,7 +648,7 @@
   }
 
   function input_digit(digit) {
-    if (game_state.finished || game_state.paused) { return; }
+    if (game_state.finished) { return; }
     game_state.selected_digit = digit;
     var index = game_state.selected_index;
     if (index < 0) {
@@ -693,9 +679,10 @@
 
   function set_value(index, digit) {
     if (game_state.values[index] === digit) { return; }
-    push_undo(index);
     game_state.values[index] = digit;
     game_state.notes[index] = [];
+    // 统计口径：每次「填入正确数字」计 1 步推导（填错不计，重复覆盖同值不重复计）
+    if (digit === game_state.solution[index]) { game_state.steps += 1; }
     var num_el = cell_elements[index].querySelector('.cell-num');
     num_el.classList.add('pop-in');
     window.setTimeout(function () { num_el.classList.remove('pop-in'); }, 200);
@@ -703,71 +690,46 @@
 
   function toggle_note(index, digit) {
     if (game_state.values[index] > 0) { return; }
-    push_undo(index);
     var notes = game_state.notes[index].slice();
     var pos = notes.indexOf(digit);
     if (pos >= 0) { notes.splice(pos, 1); }
     else {
       notes.push(digit);
       notes.sort(function (a, b) { return a - b; });
+      // 统计口径：笔记模式下每「写入」一个候选数计 1 次（擦除候选不计数）
+      game_state.note_count += 1;
     }
     game_state.notes[index] = notes;
   }
 
   function erase_cell() {
-    if (game_state.finished || game_state.paused) { return; }
+    if (game_state.finished) { return; }
     var index = game_state.selected_index;
     if (index < 0 || game_state.is_given[index]) { return; }
     if (game_state.values[index] === 0 && game_state.notes[index].length === 0) { return; }
-    push_undo(index);
     game_state.values[index] = 0;
     game_state.notes[index] = [];
     render_all();
     persist_game();
   }
 
-  function undo_step() {
-    if (game_state.finished || game_state.paused) { return; }
-    if (undo_stack.length === 0) {
-      show_toast('没有可撤销的操作');
-      return;
-    }
-    var entry = undo_stack.pop();
-    game_state.values[entry.index] = entry.prev_value;
-    game_state.notes[entry.index] = entry.prev_notes;
-    game_state.selected_index = entry.index;
-    render_all();
-    persist_game();
-  }
-
-  function use_hint() {
-    if (game_state.finished || game_state.paused) { return; }
-    var index = game_state.selected_index;
-    if (index < 0 || game_state.is_given[index] || game_state.values[index] === game_state.solution[index]) {
-      index = -1;
-      var i;
-      for (i = 0; i < CELLS; i += 1) {
-        if (!game_state.is_given[i] && game_state.values[i] !== game_state.solution[i]) {
-          index = i;
-          break;
-        }
+  // 检查全盘：红底高亮填错格子并 toast 提示数量，全对则提示全部正确。
+  // 心流玩法：不扣命、不判负、不计入任何统计。
+  function check_board() {
+    if (game_state.finished) { return; }
+    var error_count = 0;
+    var i;
+    for (i = 0; i < CELLS; i += 1) {
+      if (game_state.values[i] > 0 && game_state.values[i] !== game_state.solution[i]) {
+        error_count += 1;
       }
     }
-    if (index < 0) { return; }
-    push_undo(index);
-    game_state.values[index] = game_state.solution[index];
-    game_state.notes[index] = [];
-    game_state.selected_index = index;
-    game_state.selected_digit = game_state.solution[index];
-    render_all();
-    check_win();
-    persist_game();
-  }
-
-  function toggle_pause() {
-    if (game_state.finished) { return; }
-    game_state.paused = !game_state.paused;
-    dom.pause_overlay.hidden = !game_state.paused;
+    render_all(); // is-error-cell 类会在 update_board 中刷新高亮
+    if (error_count > 0) {
+      show_toast('有 ' + error_count + ' 处错误');
+    } else {
+      show_toast('当前全部正确');
+    }
   }
 
   function check_win() {
@@ -779,8 +741,74 @@
     game_state.finished = true;
     stop_timer();
     clear_saved_game();
-    dom.win_time.textContent = format_seconds(game_state.elapsed_seconds);
+    show_win_stats();
     dom.win_modal.hidden = false;
+  }
+
+  // ---------------- 通关结算统计 ----------------
+  // 按难度持久化历史最佳用时（秒），key -> 最小秒数
+  var BEST_KEY = 'sudoku_best_v1';
+
+  function load_best_map(callback) {
+    storage_get(BEST_KEY).then(function (raw) {
+      var map = {};
+      if (raw) {
+        try {
+          var parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') { map = parsed; }
+        } catch (error) {
+          // 报错原因：历史最佳缓存非法 JSON，按无记录处理并覆盖
+          storage_remove(BEST_KEY);
+        }
+      }
+      callback(map);
+    });
+  }
+
+  // 评级：综合用时阈值与「零浪费」（推导步数 == 需填格数）
+  function compute_grade(elapsed, steps, required_cells, difficulty_key) {
+    var thresholds = SUDOKU_GRADE_THRESHOLDS[difficulty_key];
+    if (!thresholds) { thresholds = SUDOKU_GRADE_THRESHOLDS.medium; }
+    // 通关时步数必然 >= 需填格数；恰好相等即每格一次填对、无浪费
+    var zero_waste = steps === required_cells;
+    if (zero_waste && elapsed <= thresholds.s_plus) { return 'S+'; }
+    if (zero_waste || elapsed <= thresholds.s) { return 'S'; }
+    if (elapsed <= thresholds.a) { return 'A'; }
+    return 'B';
+  }
+
+  function show_win_stats() {
+    var option = get_difficulty(game_state.difficulty_key);
+    var required_cells = 0;
+    var i;
+    for (i = 0; i < CELLS; i += 1) {
+      if (!game_state.is_given[i]) { required_cells += 1; }
+    }
+    dom.win_subtitle.textContent = option.label + ' · 纯净通关';
+    dom.stat_time.textContent = format_seconds(game_state.elapsed_seconds);
+    dom.stat_steps.textContent = String(game_state.steps);
+    dom.stat_notes.textContent = String(game_state.note_count);
+    var rate = game_state.steps > 0
+      ? Math.round(game_state.note_count / game_state.steps * 100)
+      : 0;
+    dom.stat_note_rate.textContent = '辅助标记率 ' + rate + '%';
+    dom.stat_grade.textContent = compute_grade(
+      game_state.elapsed_seconds, game_state.steps, required_cells, game_state.difficulty_key
+    );
+    // 零失误达成：推导步数恰好等于需填格数（每格一次填对、无浪费）
+    dom.stat_perfect_tag.hidden = game_state.steps !== required_cells;
+
+    // 历史最佳：比各难度最小用时速则刷新并写回
+    dom.stat_best_tag.hidden = true;
+    load_best_map(function (map) {
+      var prev_best = Number(map[game_state.difficulty_key]);
+      var is_best = !(prev_best > 0) || game_state.elapsed_seconds < prev_best;
+      dom.stat_best_tag.hidden = !is_best;
+      if (is_best) {
+        map[game_state.difficulty_key] = game_state.elapsed_seconds;
+        storage_set(BEST_KEY, map);
+      }
+    });
   }
 
   // ---------------- 日夜主题 ----------------
@@ -788,7 +816,8 @@
 
   function apply_theme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
-    dom.theme_label.textContent = theme === 'dark' ? '日间' : '夜间';
+    // 按钮展示当前模式（对齐设计稿）：日间=太阳+「日间」，夜间=月亮+「夜间」
+    dom.theme_label.textContent = theme === 'dark' ? '夜间' : '日间';
   }
 
   function toggle_theme() {
@@ -891,17 +920,11 @@
         case 'start-game':
           start_game(game_state.difficulty_key);
           break;
-        case 'toggle-pause':
-          toggle_pause();
-          break;
         case 'back-home':
           back_home();
           break;
         case 'restart-game':
           start_game(game_state.difficulty_key);
-          break;
-        case 'undo':
-          undo_step();
           break;
         case 'erase':
           erase_cell();
@@ -910,8 +933,8 @@
           game_state.note_mode = !game_state.note_mode;
           render_all();
           break;
-        case 'hint':
-          use_hint();
+        case 'check-board':
+          check_board();
           break;
         case 'toggle-theme':
           toggle_theme();
