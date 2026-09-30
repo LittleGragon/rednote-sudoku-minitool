@@ -22,6 +22,7 @@
     note_mode: false,
     elapsed_seconds: 0,
     steps: 0,          // 本次填对数字的次数（推导步数）
+    mistakes: 0,       // 本次填错数字的次数（失误次数）
     note_count: 0,     // 本次笔记模式写入候选的次数
     checked: false,    // 是否点击过「检查」：true 时正确用户格显示 ✓ 角标
     finished: false
@@ -45,6 +46,7 @@
     stat_time: document.getElementById('stat-time'),
     stat_best_tag: document.getElementById('stat-best-tag'),
     stat_steps: document.getElementById('stat-steps'),
+    stat_mistakes_note: document.getElementById('stat-mistakes-note'),
     stat_notes: document.getElementById('stat-notes'),
     stat_note_rate: document.getElementById('stat-note-rate'),
     stat_grade: document.getElementById('stat-grade'),
@@ -293,7 +295,7 @@
   function persist_game() {
     if (!game_state.puzzle.length || game_state.finished) { return; }
     storage_set(SAVE_KEY, {
-      version: 3,
+      version: 4,
       difficulty_key: game_state.difficulty_key,
       puzzle: game_state.puzzle,
       solution: game_state.solution,
@@ -301,6 +303,7 @@
       notes: game_state.notes,
       elapsed_seconds: game_state.elapsed_seconds,
       steps: game_state.steps,
+      mistakes: game_state.mistakes,
       note_count: game_state.note_count
     });
   }
@@ -311,8 +314,8 @@
 
   // 校验缓存数据完整性与一致性，不合法则视为无缓存
   function is_valid_save(save) {
-    if (!save || save.version !== 3) {
-      return false; // 报错原因：存档版本非 v3（旧版结构缺少统计字段），按无缓存处理并清除
+    if (!save || save.version !== 4) {
+      return false; // 报错原因：存档版本非 v4（v3 及更早缺少失误次数字段，无法推导），按无缓存处理并清除
     }
     if (!Array.isArray(save.puzzle) || save.puzzle.length !== CELLS) { return false; }
     if (!Array.isArray(save.solution) || save.solution.length !== CELLS) { return false; }
@@ -334,6 +337,9 @@
     if (typeof save.elapsed_seconds !== 'number' || save.elapsed_seconds < 0) { return false; }
     if (typeof save.steps !== 'number' || save.steps < 0) {
       return false; // 报错原因：推导步数字段缺失或非法，缓存被篡改或损坏
+    }
+    if (typeof save.mistakes !== 'number' || save.mistakes < 0) {
+      return false; // 报错原因：失误次数字段缺失或非法，缓存被篡改或损坏
     }
     if (typeof save.note_count !== 'number' || save.note_count < 0) {
       return false; // 报错原因：笔记次数字段缺失或非法，缓存被篡改或损坏
@@ -361,6 +367,7 @@
     game_state.note_mode = false;
     game_state.elapsed_seconds = save.elapsed_seconds;
     game_state.steps = save.steps;
+    game_state.mistakes = save.mistakes;
     game_state.note_count = save.note_count;
     game_state.finished = false;
 
@@ -625,6 +632,7 @@
     game_state.note_mode = false;
     game_state.elapsed_seconds = 0;
     game_state.steps = 0;
+    game_state.mistakes = 0;
     game_state.note_count = 0;
     game_state.checked = false;
     game_state.finished = false;
@@ -688,8 +696,9 @@
     if (game_state.values[index] === digit) { return; }
     game_state.values[index] = digit;
     game_state.notes[index] = [];
-    // 统计口径：每次「填入正确数字」计 1 步推导（填错不计，重复覆盖同值不重复计）
+    // 统计口径：每次「填入正确数字」计 1 步推导；填入错误数字计 1 次失误
     if (digit === game_state.solution[index]) { game_state.steps += 1; }
+    else { game_state.mistakes += 1; }
     var num_el = cell_elements[index].querySelector('.cell-num');
     num_el.classList.add('pop-in');
     window.setTimeout(function () { num_el.classList.remove('pop-in'); }, 200);
@@ -774,12 +783,11 @@
     });
   }
 
-  // 评级：综合用时阈值与「零浪费」（推导步数 == 需填格数）
-  function compute_grade(elapsed, steps, required_cells, difficulty_key) {
+  // 评级：综合用时阈值与「零失误」（填错次数为 0）
+  function compute_grade(elapsed, mistakes, difficulty_key) {
     var thresholds = SUDOKU_GRADE_THRESHOLDS[difficulty_key];
     if (!thresholds) { thresholds = SUDOKU_GRADE_THRESHOLDS.medium; }
-    // 通关时步数必然 >= 需填格数；恰好相等即每格一次填对、无浪费
-    var zero_waste = steps === required_cells;
+    var zero_waste = mistakes === 0;
     if (zero_waste && elapsed <= thresholds.s_plus) { return 'S+'; }
     if (zero_waste || elapsed <= thresholds.s) { return 'S'; }
     if (elapsed <= thresholds.a) { return 'A'; }
@@ -788,24 +796,21 @@
 
   function show_win_stats() {
     var option = get_difficulty(game_state.difficulty_key);
-    var required_cells = 0;
-    var i;
-    for (i = 0; i < CELLS; i += 1) {
-      if (!game_state.is_given[i]) { required_cells += 1; }
-    }
     dom.win_subtitle.textContent = option.label + ' · 纯净通关';
     dom.stat_time.textContent = format_seconds(game_state.elapsed_seconds);
     dom.stat_steps.textContent = String(game_state.steps);
+    // 失误次数：填错数字的真实计数（含填错后擦除重填）
+    dom.stat_mistakes_note.textContent = '失误 ' + game_state.mistakes + ' 次';
     dom.stat_notes.textContent = String(game_state.note_count);
     var rate = game_state.steps > 0
       ? Math.round(game_state.note_count / game_state.steps * 100)
       : 0;
     dom.stat_note_rate.textContent = '辅助标记率 ' + rate + '%';
     dom.stat_grade.textContent = compute_grade(
-      game_state.elapsed_seconds, game_state.steps, required_cells, game_state.difficulty_key
+      game_state.elapsed_seconds, game_state.mistakes, game_state.difficulty_key
     );
-    // 零失误达成：推导步数恰好等于需填格数（每格一次填对、无浪费）
-    dom.stat_perfect_tag.hidden = game_state.steps !== required_cells;
+    // 零失误达成：全程填错次数为 0
+    dom.stat_perfect_tag.hidden = game_state.mistakes !== 0;
 
     // 历史最佳：比各难度最小用时速则刷新并写回
     dom.stat_best_tag.hidden = true;
