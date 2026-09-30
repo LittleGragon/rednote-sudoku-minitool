@@ -22,19 +22,24 @@
   --text-secondary: #718096;
   --text-muted: #a0aec0;
   --on-surface-variant: #444653;
-  --error: #ba1a1a;
-  --error-solid: #e53e3e;
-  --error-container: #ffdad6;
-  --error-surface: #fed7d7;
-  --on-error-container: #93000a;
+  /* 色弱友好功能色：错误=橙红（非纯红），正确/成功=天蓝（非纯绿） */
+  --error: #c2410c;
+  --error-solid: #ea580c;
+  --error-container: #ffedd5;
+  --error-surface: #ffedd5;
+  --on-error-container: #9a3412;
   --primary-fixed: #dde1ff;
   --on-primary-fixed-variant: #1f3ba6;
   --surface-highlight: #eef2ff;
   --surface-container-high: #e7e8eb;
-  --tertiary: #006a3b;
-  --tertiary-fixed: #88f9b0;
-  --on-tertiary-fixed: #00210f;
+  --tertiary: #0284c7;
+  --tertiary-fixed: #e0f2fe;
+  --on-tertiary-fixed: #083344;
   --outline: #757684;
+  --digit-user: #3953bd;
+  --selected-ring: rgba(57, 83, 189, 0.25);
+  --same-digit-bg: rgba(57, 83, 189, 0.08);
+  --selected-bg: rgba(57, 83, 189, 0.12);
   --header-bg: rgba(248, 249, 252, 0.85);
   --overlay-bg: rgba(248, 249, 252, 0.72);
   --toast-bg: rgba(45, 55, 72, 0.94);
@@ -45,41 +50,46 @@
   --gutter: 0.75rem;
 }
 
-/* 黑白灰极简夜间模式（Monochrome）：主色为白，强调仅靠明度区分 */
+/* 高对比度·色弱友好夜间模式：靛蓝紫底、近白文字（WCAG AA），功能色与日间同族提亮 */
 html[data-theme="dark"] {
-  --primary: #ffffff;
-  --primary-container: #e4e4e7;
-  --secondary: #a1a1aa;
-  --secondary-fixed: #3f3f46;
-  --on-secondary-fixed: #e4e4e7;
-  --on-primary: #09090b;
-  --surface: #0d0d0e;
-  --surface-card: #18181b;
-  --surface-container: #202024;
-  --surface-container-low: #1e1e22;
-  --surface-crosshair: #2a2a30;
-  --border-subtle: #3f3f46;
-  --border-block: #52525b;
-  --text-primary: #f4f4f5;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
-  --on-surface-variant: #a1a1aa;
-  --error: #f87171;
-  --error-solid: #f87171;
-  --error-container: #3f2a2c;
-  --error-surface: #462e30;
-  --on-error-container: #fca5a5;
-  --primary-fixed: #26262b;
-  --on-primary-fixed-variant: #e4e4e7;
-  --surface-highlight: #202024;
-  --surface-container-high: #2a2a30;
-  --tertiary: #a1a1aa;
-  --tertiary-fixed: #3f3f46;
-  --on-tertiary-fixed: #e4e4e7;
-  --outline: #71717a;
-  --header-bg: rgba(13, 13, 14, 0.85);
-  --overlay-bg: rgba(13, 13, 14, 0.82);
-  --toast-bg: rgba(228, 228, 231, 0.96);
+  --primary: #6366f1;
+  --primary-container: #818cf8;
+  --secondary: #c4b5fd;
+  --secondary-fixed: #2e2e4d;
+  --on-secondary-fixed: #e2e0fc;
+  --on-primary: #ffffff;
+  --surface: #0f0f1a;
+  --surface-card: #18182e;
+  --surface-container: #242442;
+  --surface-container-low: #1e1e3a;
+  --surface-crosshair: #2a2a4a;
+  --border-subtle: #3d4a7c;
+  --border-block: #6b7bb0;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --on-surface-variant: #cbd5e1;
+  /* 色弱友好功能色：错误=亮橙，正确/成功=亮天蓝 */
+  --error: #fb923c;
+  --error-solid: #fb923c;
+  --error-container: #3a2418;
+  --error-surface: #42210f;
+  --on-error-container: #ffd7ba;
+  --primary-fixed: #2e2e4d;
+  --on-primary-fixed-variant: #c3c0ff;
+  --surface-highlight: #242442;
+  --surface-container-high: #2a2a4a;
+  --tertiary: #38bdf8;
+  --tertiary-fixed: #164e63;
+  --on-tertiary-fixed: #e0f2fe;
+  --outline: #64748b;
+  --digit-user: #c4b5fd;
+  --selected-ring: rgba(165, 180, 252, 0.45);
+  --same-digit-bg: rgba(196, 181, 253, 0.12);
+  --selected-bg: rgba(99, 102, 241, 0.4);
+  --header-bg: rgba(15, 15, 26, 0.85);
+  --overlay-bg: rgba(15, 15, 26, 0.82);
+  --toast-bg: rgba(241, 245, 249, 0.96);
   --card-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
   --board-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
 }
@@ -350,33 +360,47 @@ button {
   justify-content: center;
 }
 
+/* 色弱友好：预填与用户填数用「字重 + 颜色」双重区分，不依赖单一颜色 */
 .cell-num { font-size: 22px; font-weight: 700; line-height: 1; color: var(--text-primary); }
-.cell-num.is-given { color: var(--text-primary); }
-.cell-num.is-user { color: var(--primary); }
-.cell-num.is-same { color: var(--primary); font-weight: 800; }
+.cell-num.is-given { font-weight: 800; }
+.cell-num.is-user { color: var(--digit-user); font-weight: 500; }
+.cell-num.is-same { color: var(--digit-user); font-weight: 700; }
 .cell-num.is-error { color: var(--error-solid); font-weight: 800; }
 .cell-num.pop-in { animation: pop-in 0.15s ease; }
 
-/* 高亮层 */
+/* 高亮层：选中=底色+2px 边框+外光环；错误=底色+✕ 角标；正确=底色+✓ 角标 */
 .cell.is-crosshair { background: var(--surface-crosshair); }
-.cell.is-same-digit { background: rgba(57, 83, 189, 0.08); }
-html[data-theme="dark"] .cell.is-same-digit { background: rgba(228, 228, 231, 0.10); }
+.cell.is-same-digit { background: var(--same-digit-bg); }
 .cell.is-selected {
-  background: rgba(57, 83, 189, 0.12);
-  box-shadow: inset 0 0 0 2px var(--primary);
+  background: var(--selected-bg);
+  box-shadow: inset 0 0 0 2px var(--primary), 0 0 0 2px var(--selected-ring);
   z-index: 2;
 }
-html[data-theme="dark"] .cell.is-selected { background: rgba(228, 228, 231, 0.14); }
 .cell.is-error-cell { background: var(--error-surface); animation: pulse 1.5s ease-in-out infinite; }
-.cell.is-error-cell::after {
+.cell.is-correct-cell { background: var(--tertiary-fixed); }
+.cell.is-error-cell::after,
+.cell.is-correct-cell::after {
   content: "";
   position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 6px;
-  height: 6px;
+  top: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
   border-radius: 9999px;
-  background: var(--error-solid);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 8px 8px;
+  z-index: 3;
+}
+.cell.is-error-cell::after {
+  background-color: var(--error-solid);
+  /* 内联 SVG「×」：形状线索，不依赖颜色识别 */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M2 2l6 6M8 2L2 8' stroke='%23ffffff' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.cell.is-correct-cell::after {
+  background-color: var(--tertiary);
+  /* 内联 SVG「✓」：形状线索，不依赖颜色识别 */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.8 5.2l2.4 2.4L8.4 3' fill='none' stroke='%23ffffff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 /* 笔记（候选数） */
@@ -469,6 +493,8 @@ html[data-theme="dark"] .cell.is-selected { background: rgba(228, 228, 231, 0.14
 .num-key.is-selected .num-key-count { color: var(--on-primary); font-weight: 600; }
 .num-key.is-exhausted {
   background: var(--surface-container-high);
+  /* 斜线纹理：不依赖颜色即可识别「不可用」状态 */
+  background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, var(--outline) 5px, var(--outline) 6px);
   opacity: 0.45;
   box-shadow: none;
   cursor: not-allowed;
@@ -691,7 +717,7 @@ html[data-theme="dark"] .cell.is-selected { background: rgba(228, 228, 231, 0.14
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
   animation: fade-in 0.2s ease;
 }
-html[data-theme="dark"] .toast { color: #0d0d0e; }
+html[data-theme="dark"] .toast { color: #0f0f1a; }
 
 /* 主题按钮双图标：日间显示太阳，夜间显示月亮 */
 .theme-icon-moon { display: none; }

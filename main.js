@@ -23,6 +23,7 @@
     elapsed_seconds: 0,
     steps: 0,          // 本次填对数字的次数（推导步数）
     note_count: 0,     // 本次笔记模式写入候选的次数
+    checked: false,    // 是否点击过「检查」：true 时正确用户格显示 ✓ 角标
     finished: false
   };
 
@@ -49,6 +50,7 @@
     stat_grade: document.getElementById('stat-grade'),
     stat_perfect_tag: document.getElementById('stat-perfect-tag'),
     theme_label: document.getElementById('theme-label'),
+    zen_label: document.getElementById('zen-label'),
     check_toast: document.getElementById('check-toast')
   };
 
@@ -496,6 +498,10 @@
         extra.push('is-same-digit');
       }
       if (value > 0 && value !== game_state.solution[i]) { extra.push('is-error-cell'); }
+      // 色弱友好：检查后正确的用户填格加 ✓ 角标（形状线索，与 ✕ 对称）
+      if (value > 0 && !game_state.is_given[i] && value === game_state.solution[i] && game_state.checked) {
+        extra.push('is-correct-cell');
+      }
       cell.className = base_cls + (extra.length ? ' ' + extra.join(' ') : '');
 
       // 数字
@@ -620,6 +626,7 @@
     game_state.elapsed_seconds = 0;
     game_state.steps = 0;
     game_state.note_count = 0;
+    game_state.checked = false;
     game_state.finished = false;
 
     dom.difficulty_label.textContent = option.label;
@@ -713,10 +720,12 @@
     persist_game();
   }
 
-  // 检查全盘：红底高亮填错格子并 toast 提示数量，全对则提示全部正确。
+  // 检查全盘：红底+✕ 高亮填错格子并 toast 提示数量，全对则提示全部正确；
+  // 检查后正确的用户填格持续显示天蓝底+✓ 角标（形状线索，色弱友好）。
   // 心流玩法：不扣命、不判负、不计入任何统计。
   function check_board() {
     if (game_state.finished) { return; }
+    game_state.checked = true;
     var error_count = 0;
     var i;
     for (i = 0; i < CELLS; i += 1) {
@@ -818,6 +827,8 @@
     document.documentElement.setAttribute('data-theme', theme);
     // 按钮展示当前模式（对齐设计稿）：日间=太阳+「日间」，夜间=月亮+「夜间」
     dom.theme_label.textContent = theme === 'dark' ? '夜间' : '日间';
+    // 状态栏第三胶囊（对齐设计稿）：日间=「心流禅模式」，夜间=「WCAG AA」
+    dom.zen_label.textContent = theme === 'dark' ? 'WCAG AA' : '心流禅模式';
   }
 
   function toggle_theme() {
